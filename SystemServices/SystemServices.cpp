@@ -2584,8 +2584,10 @@ namespace WPEFramework {
 					LOGWARN("SystemServices::_instance is NULL.\n");
 				}
 				if (convert("DEEP_SLEEP", sleepMode)) {
+                    LOGERR("[%s]:%d ANOOJC github rdkservices Calling IARM_BUS_PWRMGR_API_SetPowerState new=%s\r\n", __func__, __LINE__, sleepMode.c_str());
 					retVal = CPowerState::instance()->setPowerState(sleepMode);
 				} else {
+                    LOGERR("[%s]:%d ANOOJC github rdkservices Calling IARM_BUS_PWRMGR_API_SetPowerState new=%s\r\n", __func__, __LINE__, state.c_str());
 					retVal = CPowerState::instance()->setPowerState(state);
 				}
 				outfile.open(STANDBY_REASON_FILE, ios::out);
@@ -2597,6 +2599,7 @@ namespace WPEFramework {
 					populateResponseWithError(SysSrv_FileAccessFailed, response);
 				}
 			} else {
+                LOGERR("[%s]:%d ANOOJC github rdkservices Calling IARM_BUS_PWRMGR_API_SetPowerState new=%s\r\n", __func__, __LINE__, state.c_str());
 				retVal = CPowerState::instance()->setPowerState(state);
 				LOGERR("this platform has no API System and/or Powerstate\n");
 			}
