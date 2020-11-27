@@ -180,6 +180,8 @@ namespace WPEFramework {
             registerMethod("setScartParameter", &DisplaySettings::setScartParameter, this);
             registerMethod("getSettopMS12Capabilities", &DisplaySettings::getSettopMS12Capabilities, this);
             registerMethod("getSettopAudioCapabilities", &DisplaySettings::getSettopAudioCapabilities, this);
+            registerMethod("setEnableAudioPort", &DisplaySettings::setEnableAudioPort, this);
+            registerMethod("getEnableAudioPort", &DisplaySettings::getEnableAudioPort, this);
         }
 
         DisplaySettings::~DisplaySettings()
@@ -216,6 +218,7 @@ namespace WPEFramework {
                 IARM_CHECK( IARM_Bus_RegisterEventHandler(IARM_BUS_DSMGR_NAME,IARM_BUS_DSMGR_EVENT_RES_PRECHANGE,ResolutionPreChange) );
                 IARM_CHECK( IARM_Bus_RegisterEventHandler(IARM_BUS_DSMGR_NAME,IARM_BUS_DSMGR_EVENT_RES_POSTCHANGE, ResolutionPostChange) );
                 IARM_CHECK( IARM_Bus_RegisterEventHandler(IARM_BUS_DSMGR_NAME,IARM_BUS_DSMGR_EVENT_HDMI_HOTPLUG, dsHdmiEventHandler) );
+                IARM_CHECK( IARM_Bus_RegisterEventHandler(IARM_BUS_DSMGR_NAME,IARM_BUS_DSMGR_EVENT_AUDIO_OUT_HOTPLUG, dsAudioOutEventHandler) );
             }
 
             try
@@ -395,6 +398,28 @@ namespace WPEFramework {
                 break;
             }
         }
+
+        void DisplaySettings::dsAudioOutEventHandler(const char *owner, IARM_EventId_t eventId, void *data, size_t len)
+        {
+            LOGINFO();
+            switch (eventId)
+            {
+            case IARM_BUS_DSMGR_EVENT_AUDIO_OUT_HOTPLUG :
+                {
+                    IARM_Bus_DSMgr_EventData_t *eventData = (IARM_Bus_DSMgr_EventData_t *)data;
+                    int iAudioPortType = eventData->data.audio_out_connect.portType;
+                    bool isPortConnected = eventData->data.audio_out_connect.isPortConnected;
+                    LOGINFO("Received IARM_BUS_DSMGR_EVENT_AUDIO_OUT_HOTPLUG for audio port %d event data:%d ", iAudioPortType, isPortConnected);
+                    if(DisplaySettings::_instance)
+                        DisplaySettings::_instance->connectedAudioPortUpdated(iAudioPortType, isPortConnected);
+                }
+                break;
+            default:
+                //do nothing
+                break;
+            }
+        }
+
 
         void setResponseArray(JsonObject& response, const char* key, const vector<string>& items)
         {
@@ -2427,6 +2452,39 @@ namespace WPEFramework {
             }
             previousStatus = hdmiHotPlugEvent;
         }
+
+        void DisplaySettings::connectedAudioPortUpdated (int iAudioPortType, bool isPortConnected)
+        {
+            LOGINFO();
+
+            JsonObject params;
+            string sPortName;
+            string sPortStatus;
+            switch (iAudioPortType)
+            {
+                case dsAUDIOPORT_TYPE_HDMI :
+                    params["HotpluggedAudioPort"] = "HDMI0";
+                    sPortName.assign ("HDMI0");
+                    break;
+                default:
+                    //do nothing
+                	break;
+            }
+
+            if (1 == isPortConnected)
+            {
+                params["isConnected"] = "connected";
+                sPortStatus.assign ("connected");
+            }
+            else
+            {
+                params["isConnected"] = "disconnected";
+                sPortStatus.assign ("disconnected");
+            }
+            LOGWARN ("Thunder sends notification %s audio port hotplug status %s", sPortName.c_str(), sPortStatus.c_str());
+            sendNotify("connectedAudioPortUpdated", params);
+        }
+
         //End events
 
         void DisplaySettings::getConnectedVideoDisplaysHelper(vector<string>& connectedDisplays)
@@ -2472,6 +2530,66 @@ namespace WPEFramework {
                 return false;
 
             return true;
+        }
+
+        uint32_t DisplaySettings::setEnableAudioPort (const JsonObject& parameters, JsonObject& response)
+        {   //sample servicemanager response:
+            LOGINFOMETHOD();
+            returnIfParamNotFound(parameters, "enableState");
+
+            string sEnableState = parameters["enableState"].String();
+            bool isEnable = false;
+
+            try
+            {
+                isEnable = parameters["enableState"].Boolean();
+            }
+            catch (const std::exception &err)
+            {
+               LOGERR("Failed to parse setEnableAudioPort state: '%s'", sEnableState.c_str());
+               returnResponse(false);
+            }
+
+            bool success = true;
+            string audioPort = parameters.HasLabel("audioPort") ? parameters["audioPort"].String() : "HDMI0";
+            LOGWARN ("Thunder requests audioPort %s to set state enable to: %d", audioPort.c_str(), (isEnable?("TRUE"):("FALSE")));
+            try
+            {
+                device::AudioOutputPort aPort = device::Host::getInstance().getAudioOutputPort(audioPort);
+                if (true == isEnable) {
+                    aPort.enable();
+                }
+                else {
+                    aPort.disable();
+                }
+            }
+            catch (const device::Exception& err)
+            {
+                LOG_DEVICE_EXCEPTION2(audioPort, sEnableState);
+                success = false;
+            }
+            returnResponse(success);
+        }
+
+        uint32_t DisplaySettings::getEnableAudioPort (const JsonObject& parameters, JsonObject& response)
+        {   //sample servicemanager response:
+            LOGINFOMETHOD();
+                       bool success = true;
+
+            string audioPort = parameters.HasLabel("audioPort") ? parameters["audioPort"].String() : "HDMI0";
+            try
+            {
+                device::AudioOutputPort aPort = device::Host::getInstance().getAudioOutputPort(audioPort);
+                bool isEnabled = aPort.isEnabled();
+                response["enableState"] = isEnabled;
+                LOGWARN ("Thunder sending response to get state enable for audioPort %s is: %d", audioPort.c_str(), (isEnabled?("TRUE"):("FALSE"))); 
+            }
+            catch(const device::Exception& err)
+            {
+                LOG_DEVICE_EXCEPTION1(audioPort);
+                success = false;
+            }
+            returnResponse(success);
         }
 
     } // namespace Plugin

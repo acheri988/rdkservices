@@ -112,6 +112,8 @@ namespace WPEFramework {
             uint32_t setDRCMode(const JsonObject& parameters, JsonObject& response);
             uint32_t getSettopMS12Capabilities(const JsonObject& parameters, JsonObject& response);
             uint32_t getSettopAudioCapabilities(const JsonObject& parameters, JsonObject& response);
+            uint32_t setEnableAudioPort(const JsonObject& parameters, JsonObject& response);
+            uint32_t getEnableAudioPort(const JsonObject& parameters, JsonObject& response);
             //End methods
 
             //Begin events
@@ -120,6 +122,7 @@ namespace WPEFramework {
             void zoomSettingUpdated(const string& zoomSetting);
             void activeInputChanged(bool activeInput);
             void connectedVideoDisplaysUpdated(int hdmiHotPlugEvent);
+            void connectedAudioPortUpdated (int iAudioPortType, bool isPortConnected);
             //End events
         public:
             DisplaySettings();
@@ -134,6 +137,7 @@ namespace WPEFramework {
             static void ResolutionPostChange(const char *owner, IARM_EventId_t eventId, void *data, size_t len);
             static void DisplResolutionHandler(const char *owner, IARM_EventId_t eventId, void *data, size_t len);
             static void dsHdmiEventHandler(const char *owner, IARM_EventId_t eventId, void *data, size_t len);
+            static void dsAudioOutEventHandler(const char *owner, IARM_EventId_t eventId, void *data, size_t len);
             void getConnectedVideoDisplaysHelper(std::vector<string>& connectedDisplays);
             bool checkPortName(std::string& name) const;
         public:
